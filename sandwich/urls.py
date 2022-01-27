@@ -7,4 +7,5 @@ urlpatterns = [
     path('/toppings', ToppingView.as_view()),
     path('/cheeses', CheeseView.as_view()),
     path('/sources', SourceView.as_view()),
+    path('/sandwiches', SandwichView.as_view()),
 ]
