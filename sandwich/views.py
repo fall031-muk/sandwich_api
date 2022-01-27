@@ -5,6 +5,125 @@ from django.http import JsonResponse
 
 from .models import *
 
+class SandwichView(View):
+    def post(self, request):
+        try:
+            data    = json.loads(request.body)
+            bread   = data['bread']
+            topping = data['topping']
+            cheese  = data['cheese']
+            source  = data['source']
+
+            bread   = Bread.objects.get(name=bread)
+            topping = Topping.objects.get(name=topping)
+            cheese  = Cheese.objects.get(name=cheese)
+            source  = Source.objects.get(name=source)
+
+            if bread.quantity_left == 0:
+                return JsonResponse({"MESSAGE" : "BREAD_QUANTITY_DOES_NOT_EXIST"}, status=404)
+            if topping.quantity_left == 0:
+                return JsonResponse({"MESSAGE" : "TOPPING_QUANTITY_DOES_NOT_EXIST"}, status=404)
+            if cheese.quantity_left == 0:
+                return JsonResponse({"MESSAGE" : "CHEESE_QUANTITY_DOES_NOT_EXIST"}, status=404)
+            if source.quantity_left == 0:
+                return JsonResponse({"MESSAGE" : "SOURCE_QUANTITY_DOES_NOT_EXIST"}, status=404)
+        
+            Sandwich.objects.create(
+                bread_id   = bread.id,
+                topping_id = topping.id,
+                cheese_id  = cheese.id,
+                source_id  = source.id 
+            )
+            
+            bread.quantity_left -= 1
+            bread.save()
+            topping.quantity_left -= 1
+            topping.save()
+            cheese.quantity_left -= 1
+            cheese.save()
+            source.quantity_left -= 1
+            source.save()
+            return JsonResponse({"MESSAGE" : "SUCCESS"}, status=201)     
+
+        except Bread.DoesNotExist:
+            return JsonResponse({"MESSAGE" : "BREAD_DOES_NOT_EXIST"}, status=404)
+        except Topping.DoesNotExist:
+            return JsonResponse({"MESSAGE" : "TOPPING_DOES_NOT_EXIST"}, status=404)
+        except Cheese.DoesNotExist:
+            return JsonResponse({"MESSAGE" : "CHEESE_DOES_NOT_EXIST"}, status=404)
+        except Source.DoesNotExist:
+            return JsonResponse({"MESSAGE" : "SOURCE_DOES_NOT_EXIST"}, status=404)
+
+        except KeyError:
+            return JsonResponse({"MESSAGE" : "KEY_ERROR"}, status=400)        
+
+    def get(self, request):
+        try:
+            number         = request.GET.get("number")
+            bread_search   = request.GET.get("bread_name")
+            topping_search = request.GET.get("topping_name")
+            cheese_search  = request.GET.get("cheese_name")
+            source_search  = request.GET.get("source_name")
+            OFFSET         = int(request.GET.get("offset", 0))
+            LIMIT          = int(request.GET.get("limit", 10))
+            sandwiches     = Sandwich.objects.all()
+
+            if number:
+                sandwich = sandwiches.get(id=number)
+                Result = {
+                    "bread"   : sandwich.bread.name,
+                    "topping" : sandwich.topping.name,
+                    "cheese"  : sandwich.cheese.name,
+                    "source"  : sandwich.source.name,
+                    "price"   : sandwich.bread.price + sandwich.topping.price + sandwich.cheese.price + sandwich.source.price
+                }
+
+            if bread_search:
+                sandwiches = sandwiches.filter(bread__name__contains=bread_search)
+            if topping_search:
+                sandwiches = sandwiches.filter(topping__name__contains=topping_search)
+            if cheese_search:
+                sandwiches = sandwiches.filter(cheese__name__contains=cheese_search)
+            if source_search:
+                sandwiches = sandwiches.filter(source__name__contains=source_search)
+            
+            sandwiches = sandwiches[OFFSET:OFFSET+LIMIT]
+
+            Result = [{
+                    "id"      : sandwich.id,
+                    "bread"   : sandwich.bread.name,
+                    "topping" : sandwich.topping.name,
+                    "cheese"  : sandwich.cheese.name,
+                    "source"  : sandwich.source.name,
+                    "price"   : sandwich.bread.price + sandwich.topping.price + sandwich.cheese.price + sandwich.source.price
+                }for sandwich in sandwiches]
+            
+            return JsonResponse({"Result":Result}, status=200)
+        except Sandwich.DoesNotExist:
+            return JsonResponse({"MESSAGE":"SANDWICH_DOES_NOT_EXIST"}, status=404)
+
+    def delete(self, request):
+        try:
+            number   = request.GET.get("number")
+            sandwich = Sandwich.objects.get(id=number)
+            sandwich.delete()
+            bread = sandwich.bread
+            bread.quantity_left += 1
+            bread.save()
+            topping = sandwich.topping
+            topping.quantity_left += 1
+            topping.save()
+            cheese = sandwich.cheese
+            cheese.quantity_left += 1
+            cheese.save()
+            source = sandwich.source
+            source.quantity_left += 1
+            source.save()
+
+            return JsonResponse({"MESSAGE":"DELETE"}, status=204)
+        
+        except Bread.DoesNotExist:
+            return JsonResponse({"MESSAGE":"SANDWICH_DOES_NOT_EXIST"}, status=404)
 
 class BreadView(View):
     def get(self, request):
